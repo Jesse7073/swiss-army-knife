@@ -1,0 +1,44 @@
+# 後端 CI：PR 到 test / main 時，在 merge 前編譯並測試 backend/
+# TODO（之後有 frontend-ci 時）：處理 paths 篩選跳過 workflow 時，required status check 卡在 Pending 的問題
+
+name: Backend CI
+#   - PR 目標是 test 或 main 時觸發
+#   - 只有 backend/ 或這個檔案本身有變更時才觸發
+on:
+  pull_request:
+    branches:
+      - test
+      - main
+    paths:
+      - backend/**
+      - .github/workflows/backend-ci.yml
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container:
+      image: eclipse-temurin:21-jdk
+    services:
+      # service name
+      db:
+        image: postgres:17
+        env:
+          # PostgreSQL 官方 Docker image 定義的環境變數
+          POSTGRES_DB: workbench
+          POSTGRES_PASSWORD: test_postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: run-test
+        run: ./mvnw test
+        working-directory: ./backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/workbench
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: test_postgres
